@@ -28,7 +28,8 @@ Most trading system tutorials use pre-built libraries. This project builds every
 - A **position tracker** that maintains weighted average cost basis and computes realised and unrealised profit/loss in real time
 - A **risk manager** that enforces position limits, daily loss caps, and a kill switch
 - A **live dashboard** that fetches real historical minute bar data from Massive.com and displays results in the browser
-- <img width="1512" height="982" alt="272abd2d475422325d48bcb8bce15699" src="https://github.com/user-attachments/assets/fedb969d-5d53-4fb9-83af-bc749f5a234a" />
+<img width="1512" height="982" alt="Screenshot 2026-04-26 at 9 08 37 PM" src="https://github.com/user-attachments/assets/68cdb263-66d3-49c9-ae67-9fde1ac2f251" />
+
 
 
 ---
@@ -225,6 +226,8 @@ The system fetches 1-minute bars over the last 8 calendar days (approximately 5 
 2. Classifies volume as buy or sell based on whether close was above or below VWAP
 3. Computes a running VWAP and order flow delta (buy volume minus sell volume)
 4. Feeds the close price into the strategy
+
+<img width="1512" height="982" alt="Screenshot 2026-04-26 at 9 09 02 PM" src="https://github.com/user-attachments/assets/554253e4-6a2b-4c76-b739-1451d817fb98" />
 
 ---
 
