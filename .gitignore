@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env_1
+C++_project/
+personal_project/
+tutorial.py
+.vscode/
