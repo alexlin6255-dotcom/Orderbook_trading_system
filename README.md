@@ -28,6 +28,8 @@ Most trading system tutorials use pre-built libraries. This project builds every
 - A **position tracker** that maintains weighted average cost basis and computes realised and unrealised profit/loss in real time
 - A **risk manager** that enforces position limits, daily loss caps, and a kill switch
 - A **live dashboard** that fetches real historical minute bar data from Massive.com and displays results in the browser
+- <img width="1512" height="982" alt="272abd2d475422325d48bcb8bce15699" src="https://github.com/user-attachments/assets/fedb969d-5d53-4fb9-83af-bc749f5a234a" />
+
 
 ---
 
