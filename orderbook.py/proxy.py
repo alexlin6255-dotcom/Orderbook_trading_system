@@ -12,11 +12,10 @@ import os
 import sys
 from datetime import date, timedelta
 
-PORT = 8888
+PORT = int(os.environ.get("PORT", 8888))
 
 # Always serve files from the same folder as this script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
@@ -65,16 +64,21 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        length = int(self.headers.get("Content-Length", 0))
-        body = json.loads(self.rfile.read(length))
-        ticker = body.get("ticker", "").upper().strip()
-        api_key = body.get("api_key", "").strip()
+        length  = int(self.headers.get("Content-Length", 0))
+        body    = json.loads(self.rfile.read(length))
+        ticker  = body.get("ticker", "").upper().strip()
 
-        if not ticker or not api_key:
-            self._err(400, "Missing ticker or api_key")
+        # API key lives on the server — never sent by the client
+        api_key = os.environ.get("MASSIVE_API_KEY", "").strip()
+
+        if not ticker:
+            self._err(400, "Missing ticker")
+            return
+        if not api_key:
+            self._err(500, "Server not configured: MASSIVE_API_KEY environment variable not set")
             return
 
-        date_to = date.today() - timedelta(days=1)
+        date_to   = date.today() - timedelta(days=1)
         date_from = date_to - timedelta(days=8)
 
         url = (
@@ -86,8 +90,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         print(f"  Fetching {ticker} ...")
 
         try:
-            req = urllib.request.Request(
-                url, headers={"Authorization": f"Bearer {api_key}"})
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read())
         except urllib.error.HTTPError as e:
@@ -107,8 +110,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
         results = data.get("results") or []
         if not results:
-            self._err(
-                404, f"No data for '{ticker}'. Symbol may be invalid or market was closed.")
+            self._err(404, f"No data for '{ticker}'. Symbol may be invalid or market was closed.")
             return
 
         print(f"  OK {ticker}: {len(results)} bars")
@@ -137,7 +139,7 @@ if __name__ == "__main__":
     print("  OrderBook Dashboard Proxy")
     print("=" * 52)
     print(f"  Serving files from: {SCRIPT_DIR}")
-    print(f"  Dashboard:  http://localhost:{PORT}/trading_dashboard.html")
+    print(f"  Dashboard:  http://127.0.0.1:{PORT}/trading_dashboard.html")
     print()
     print("  Keep this terminal open. Press Ctrl+C to stop.")
     print("=" * 52)
@@ -150,7 +152,7 @@ if __name__ == "__main__":
         print(f"  Make sure both files are in the same folder.")
         print()
 
-    server = http.server.HTTPServer(("localhost", PORT), ProxyHandler)
+    server = http.server.HTTPServer(("0.0.0.0", PORT), ProxyHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
