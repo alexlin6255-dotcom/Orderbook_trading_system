@@ -280,7 +280,6 @@ Below the ladder, three summary statistics are shown:
 Ask depth — total shares/contracts resting on the sell side
 Imbalance — the percentage skew toward buyers or sellers, computed as (bid_depth - ask_depth) / (bid_depth + ask_depth). A reading of 70% bid-heavy means buyers have significantly more resting liquidity than sellers, which can indicate upward price pressure.
 
-## <img width="1512" height="982" alt="Screenshot 2026-04-26 at 7 57 51 PM" src="https://github.com/user-attachments/assets/06b368cd-55d3-4bd5-ad54-4b098b681827" />
 Price Distribution Chart
 Below the ladder is a bar chart showing order size at every price level across the full book. Bids and asks are rendered as side-by-side bars at each level, giving a complete picture of the liquidity profile. Key things to look for:
 
