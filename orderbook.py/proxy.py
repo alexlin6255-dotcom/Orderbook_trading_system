@@ -67,15 +67,10 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         length  = int(self.headers.get("Content-Length", 0))
         body    = json.loads(self.rfile.read(length))
         ticker  = body.get("ticker", "").upper().strip()
+        api_key = body.get("api_key", "").strip()
 
-        # API key lives on the server — never sent by the client
-        api_key = os.environ.get("MASSIVE_API_KEY", "").strip()
-
-        if not ticker:
-            self._err(400, "Missing ticker")
-            return
-        if not api_key:
-            self._err(500, "Server not configured: MASSIVE_API_KEY environment variable not set")
+        if not ticker or not api_key:
+            self._err(400, "Missing ticker or api_key")
             return
 
         date_to   = date.today() - timedelta(days=1)
@@ -152,7 +147,7 @@ if __name__ == "__main__":
         print(f"  Make sure both files are in the same folder.")
         print()
 
-    server = http.server.HTTPServer(("0.0.0.0", PORT), ProxyHandler)
+    server = http.server.HTTPServer(("127.0.0.1", PORT), ProxyHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

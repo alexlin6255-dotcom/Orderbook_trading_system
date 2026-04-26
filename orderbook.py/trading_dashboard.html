@@ -24,6 +24,13 @@ body { background:var(--bg); color:var(--text); font-size:14px; line-height:1.6;
 
 
 
+/* API KEY */
+.apikey-row { display:flex; align-items:stretch; border:1.5px solid var(--bdr); margin-bottom:10px; }
+.apikey-label { padding:8px 14px; font-size:10px; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); border-right:1px solid var(--bdr); white-space:nowrap; background:var(--surf2); display:flex; align-items:center; }
+.apikey-input { flex:1; padding:8px 14px; border:none; outline:none; background:transparent; font-size:13px; color:var(--text); }
+.apikey-input::placeholder { color:var(--muted); font-style:italic; }
+.apikey-note { padding:8px 14px; font-size:11px; color:var(--muted); border-left:1px solid var(--bdr); white-space:nowrap; display:flex; align-items:center; }
+
 /* TICKER ROW */
 .input-section { display:flex; flex-direction:column; gap:8px; }
 .input-row { display:flex; align-items:stretch; border:1.5px solid var(--text); }
@@ -138,6 +145,14 @@ body { background:var(--bg); color:var(--text); font-size:14px; line-height:1.6;
     <div class="status-pill"><span class="dot"></span><span id="feed-lbl">Massive.com · Ready</span></div>
   </div>
 
+  <div class="apikey-row">
+    <span class="apikey-label">Massive API Key</span>
+    <input class="apikey-input" id="api-key" type="password"
+      placeholder="Paste your free Massive.com API key here"
+      autocomplete="off" />
+    <span class="apikey-note">Get a free key at massive.com · stays on your machine</span>
+  </div>
+
   <div class="input-section">
     <div class="input-row">
       <span class="input-label">Tickers</span>
@@ -174,14 +189,14 @@ body { background:var(--bg); color:var(--text); font-size:14px; line-height:1.6;
       <span><strong>Step 1</strong> — Open a terminal in the same folder as these files</span>
       <span><strong>Step 2</strong> — Run: <code>python proxy.py</code></span>
       <span><strong>Step 3</strong> — Open <code>http://127.0.0.1:8888/trading_dashboard.html</code></span>
-      <span><strong>Step 4</strong> — Enter tickers and click Run</span>
+      <span><strong>Step 4</strong> — Paste your free Massive.com API key and click Run</span>
     </div>
   </div>
 </div>
 
 <script>
 const SERIF = "'Times New Roman', Times, serif";
-const PROXY = "RAILWAY_URL_PLACEHOLDER";
+const PROXY = "http://127.0.0.1:8888";
 let allData = {}, activeTicker = null, charts = {};
 
 function set(v) { document.getElementById('ticker-input').value = v; }
@@ -267,9 +282,11 @@ function runStrategy(bars) {
 
 // ── Run ───────────────────────────────────────────────────────────────────────
 async function runAll() {
+  const apiKey  = document.getElementById('api-key').value.trim();
   const tickers = document.getElementById('ticker-input').value
     .trim().split(/[,\s]+/).map(t=>t.toUpperCase().trim()).filter(Boolean);
 
+  if (!apiKey) { alert('Please paste your Massive.com API key first.\nGet a free one at massive.com'); return; }
   if (!tickers.length) { alert('Please enter at least one ticker symbol.'); return; }
 
   const btn = document.getElementById('run-btn');
@@ -289,7 +306,7 @@ async function runAll() {
       const res  = await fetch(PROXY+'/fetch-bars', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ ticker:t })
+        body: JSON.stringify({ ticker:t, api_key:apiKey })
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'API error '+res.status);
