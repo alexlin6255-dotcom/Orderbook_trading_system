@@ -100,6 +100,42 @@ body { background:var(--bg); color:var(--text); font-size:14px; line-height:1.6;
 .ttype.sell-win  { color:var(--green); border-color:var(--green); }
 .ttype.sell-loss { color:var(--red);   border-color:var(--red); }
 
+
+/* ORDERBOOK LADDER */
+.ob-ladder { display:flex; flex-direction:column; gap:0; }
+.ob-ladder-hdr { display:grid; grid-template-columns:1fr 90px 1fr; font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); padding:0 0 7px; border-bottom:1.5px solid var(--text); margin-bottom:4px; }
+.ob-ladder-hdr span:last-child { text-align:right; }
+.ob-lrow { display:grid; grid-template-columns:1fr 90px 1fr; align-items:center; height:28px; border-bottom:.5px solid var(--surf2); transition:background .1s; }
+.ob-lrow:hover { background:var(--surf); }
+.ob-lrow.ask-row { background:rgba(140,26,26,0.03); }
+.ob-lrow.bid-row { background:rgba(20,82,40,0.03); }
+.ob-lrow.ask-row:hover { background:rgba(140,26,26,0.07); }
+.ob-lrow.bid-row:hover { background:rgba(20,82,40,0.07); }
+.ob-cell-bid { display:flex; align-items:center; justify-content:flex-start; gap:6px; height:100%; padding-right:4px; }
+.ob-cell-ask { display:flex; align-items:center; justify-content:flex-end; gap:6px; height:100%; padding-left:4px; }
+.ob-lbar { height:12px; min-width:2px; }
+.ob-lbar.bid { background:var(--green); opacity:.5; }
+.ob-lbar.ask { background:var(--red);   opacity:.45; }
+.ob-lqty { font-size:11px; font-weight:700; min-width:54px; }
+.ob-lqty.bid { color:var(--green); text-align:left; }
+.ob-lqty.ask { color:var(--red);   text-align:right; }
+.ob-lprice { font-size:12px; font-weight:700; text-align:center; letter-spacing:.02em; }
+.ob-lprice.ask { color:var(--red); }
+.ob-lprice.bid { color:var(--green); }
+.ob-spread-lbl { display:grid; grid-template-columns:1fr 90px 1fr; height:24px; align-items:center; background:var(--surf2); margin:3px 0; }
+.ob-spread-txt { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); text-align:center; }
+.ob-summary { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); padding:8px 0 0; border-top:.5px solid var(--bdr); margin-top:4px; gap:8px; }
+.ob-summary span strong { font-weight:700; }
+
+/* DISTRIBUTION CHART below ladder */
+.ob-dist-wrap { margin-top:16px; border-top:1px solid var(--bdr); padding-top:14px; }
+.ob-dist-hdr { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+.ob-dist-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.14em; }
+.ob-dist-sub { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+
+/* Make bottom row wider for the new OB panel */
+.btm-row { display:grid; grid-template-columns:1.4fr 1fr; border:1.5px solid var(--text); }
+
 /* OB */
 .ob-row { display:grid; grid-template-columns:52px 1fr 76px; gap:8px; align-items:center; padding:4px 0; font-size:11px; }
 .ob-bar-wrap { height:10px; display:flex; align-items:center; overflow:hidden; }
@@ -375,8 +411,9 @@ function showDashboard(t) {
         <div id="tlog-${t}"></div>
       </div>
       <div class="ob-card">
-        <div class="chart-hdr" style="margin-bottom:12px;"><span class="chart-title">Order Book Depth</span><span class="chart-tag">${t}</span></div>
+        <div class="chart-hdr" style="margin-bottom:12px;"><span class="chart-title">Order Book Ladder</span><span class="chart-tag">${t} &middot; live depth</span></div>
         <div id="ob-${t}"></div>
+        <div class="ob-dist-wrap" id="ob-dist-${t}"></div>
       </div>
     </div>
     <div class="status-bar" id="sb-${t}"></div>`;
@@ -506,16 +543,163 @@ function fillLog(t,evs) {
   c.innerHTML=`<div class="trade-list"><div class="trade-hdr"><span>Type</span><span>Price</span><span>Z</span><span>Target / Stop</span><span style="text-align:right">Running P&L</span></div>${rows}</div>`;
 }
 
-// ── Order Book ────────────────────────────────────────────────────────────────
-function fillOb(t,ob) {
-  const c=document.getElementById('ob-'+t); if(!c) return;
-  if(!ob) { c.innerHTML='<div style="color:var(--muted);font-size:11px;font-style:italic;padding:8px 0">No depth data</div>'; return; }
-  const bids=(ob.bids||[]).slice(0,5),asks=(ob.asks||[]).slice(0,5);
-  const maxQ=Math.max(...[...bids,...asks].map(l=>l[1]),1);
-  const spread=asks.length&&bids.length?Math.abs(asks[0][0]-bids[0][0]).toFixed(5):'—';
-  const aHtml=[...asks].reverse().map(([p,q])=>{const pct=(q/maxQ*100).toFixed(0);return `<div class="ob-row"><span style="color:var(--muted);text-align:right;font-size:11px">${q}</span><div class="ob-bar-wrap"><div class="ob-bar ask" style="width:${pct}%"></div></div><span style="color:var(--red);font-weight:700;font-size:11px;text-align:right">${p}</span></div>`;}).join('');
-  const bHtml=bids.map(([p,q])=>{const pct=(q/maxQ*100).toFixed(0);return `<div class="ob-row"><span style="color:var(--green);font-weight:700;font-size:11px">${p}</span><div class="ob-bar-wrap"><div class="ob-bar bid" style="width:${pct}%"></div></div><span style="color:var(--muted);font-size:11px">${q}</span></div>`;}).join('');
-  c.innerHTML=`<div class="ob-row" style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:3px;"><span>qty</span><span></span><span style="text-align:right">ask</span></div>${aHtml}<div class="ob-spread">Spread ${spread}</div>${bHtml}<div class="ob-row" style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;border-top:1px solid var(--bdr);padding-top:5px;margin-top:3px;"><span>bid</span><span></span><span></span></div>`;
+// ── Order Book Ladder + Distribution ─────────────────────────────────────────
+function fillOb(t, ob) {
+  const c = document.getElementById('ob-' + t);
+  const distWrap = document.getElementById('ob-dist-' + t);
+  if (!c) return;
+  if (!ob) {
+    c.innerHTML = '<div style="color:var(--muted);font-size:11px;font-style:italic;padding:8px 0">No depth data</div>';
+    return;
+  }
+
+  const bids = (ob.bids || []).slice(0, 8);
+  const asks = (ob.asks || []).slice(0, 8);
+  const allQtys = [...bids, ...asks].map(l => l[1]);
+  const maxQ = Math.max(...allQtys, 1);
+
+  const spread = asks.length && bids.length
+    ? Math.abs(asks[0][0] - bids[0][0]).toFixed(5) : '—';
+
+  function fmtQ(n) {
+    if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+    if (n >= 1e3) return Math.round(n/1000)+'K';
+    return n.toLocaleString();
+  }
+
+  // ── Header ──
+  let html = `<div class="ob-ladder-hdr"><span>Bid size</span><span style="text-align:center">Price</span><span>Ask size</span></div>`;
+
+  // ── Asks (reversed so highest ask is at top) ──
+  [...asks].reverse().forEach(([p, q]) => {
+    const barW = Math.max((q / maxQ) * 100, 2).toFixed(1);
+    html += `<div class="ob-lrow ask-row">
+      <div></div>
+      <div class="ob-lprice ask">${parseFloat(p).toFixed(3)}</div>
+      <div class="ob-cell-ask">
+        <span class="ob-lqty ask">${fmtQ(q)}</span>
+        <div class="ob-lbar ask" style="width:${barW}%"></div>
+      </div>
+    </div>`;
+  });
+
+  // ── Spread row ──
+  const midPrice = asks.length && bids.length ? ((asks[0][0] + bids[0][0]) / 2).toFixed(3) : '—';
+  html += `<div class="ob-spread-lbl"><div></div><div class="ob-spread-txt">spread $${spread} &middot; mid ${midPrice}</div><div></div></div>`;
+
+  // ── Bids ──
+  bids.forEach(([p, q]) => {
+    const barW = Math.max((q / maxQ) * 100, 2).toFixed(1);
+    html += `<div class="ob-lrow bid-row">
+      <div class="ob-cell-bid">
+        <div class="ob-lbar bid" style="width:${barW}%"></div>
+        <span class="ob-lqty bid">${fmtQ(q)}</span>
+      </div>
+      <div class="ob-lprice bid">${parseFloat(p).toFixed(3)}</div>
+      <div></div>
+    </div>`;
+  });
+
+  // ── Summary stats ──
+  const totalBid = bids.reduce((s,[,q]) => s+q, 0);
+  const totalAsk = asks.reduce((s,[,q]) => s+q, 0);
+  const imbal = totalBid + totalAsk > 0
+    ? ((totalBid - totalAsk) / (totalBid + totalAsk) * 100).toFixed(1) : '0';
+  const imbalDir = parseFloat(imbal) >= 0 ? 'bid-heavy' : 'ask-heavy';
+  const imbalColor = parseFloat(imbal) >= 0 ? 'var(--green)' : 'var(--red)';
+
+  html += `<div class="ob-summary">
+    <span>Bid depth: <strong style="color:var(--green)">${fmtQ(totalBid)}</strong></span>
+    <span>Ask depth: <strong style="color:var(--red)">${fmtQ(totalAsk)}</strong></span>
+    <span>Imbalance: <strong style="color:${imbalColor}">${Math.abs(parseFloat(imbal)).toFixed(1)}% ${imbalDir}</strong></span>
+  </div>`;
+
+  c.innerHTML = html;
+
+  // ── Price Distribution Chart ──
+  if (distWrap) {
+    if (charts[t] && charts[t].dist) { charts[t].dist.destroy(); }
+
+    const allLevels = [
+      ...asks.map(([p,q]) => ({ price: parseFloat(p), qty: q, side: 'ask' })),
+      ...bids.map(([p,q]) => ({ price: parseFloat(p), qty: q, side: 'bid' })),
+    ].sort((a, b) => a.price - b.price);
+
+    const labels   = allLevels.map(l => l.price.toFixed(3));
+    const bidData  = allLevels.map(l => l.side === 'bid' ? l.qty : 0);
+    const askData  = allLevels.map(l => l.side === 'ask' ? l.qty : 0);
+
+    distWrap.innerHTML = `
+      <div class="ob-dist-hdr">
+        <span class="ob-dist-title">Price distribution</span>
+        <span class="ob-dist-sub">order size by level</span>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:8px;font-size:10px;color:var(--muted);">
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:10px;height:10px;background:rgba(20,82,40,0.6);display:inline-block;"></span>Bids
+        </span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:10px;height:10px;background:rgba(140,26,26,0.55);display:inline-block;"></span>Asks
+        </span>
+      </div>
+      <div style="position:relative;width:100%;height:130px;">
+        <canvas id="dist-${t}" role="img" aria-label="Order size distribution by price level for ${t}">Distribution chart.</canvas>
+      </div>`;
+
+    const canvas = document.getElementById('dist-' + t);
+    if (canvas) {
+      const ch = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Bid', data: bidData, backgroundColor: 'rgba(20,82,40,0.6)',  borderColor: '#145228', borderWidth: 1, borderRadius: 0 },
+            { label: 'Ask', data: askData, backgroundColor: 'rgba(140,26,26,0.55)', borderColor: '#8c1a1a', borderWidth: 1, borderRadius: 0 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#fff', borderColor: '#d0cec7', borderWidth: 1,
+              titleColor: '#706e68', bodyColor: '#111',
+              titleFont: { family: SERIF, size: 10 },
+              bodyFont:  { family: SERIF, size: 11 },
+              padding: 8,
+              callbacks: {
+                title: ctx => '$' + ctx[0].label,
+                label: ctx => ' ' + ctx.dataset.label + ': ' + fmtQ(ctx.parsed.y),
+              }
+            }
+          },
+          scales: {
+            x: {
+              stacked: false,
+              grid: { display: false },
+              ticks: { color: '#706e68', font: { family: SERIF, size: 9 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 8 },
+              border: { color: '#111', width: 1 },
+            },
+            y: {
+              grid: { color: 'rgba(0,0,0,0.04)' },
+              ticks: { color: '#706e68', font: { family: SERIF, size: 9 }, callback: v => fmtQ(v) },
+              border: { color: '#111', width: 1 },
+            }
+          },
+          animation: { duration: 400 },
+        }
+      });
+      if (!charts[t]) charts[t] = {};
+      charts[t].dist = ch;
+    }
+  }
+
+  function fmtQ(n) {
+    if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+    if (n >= 1e3) return Math.round(n/1000)+'K';
+    return n.toLocaleString();
+  }
 }
 
 // ── Status Bar ────────────────────────────────────────────────────────────────
