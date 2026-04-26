@@ -268,6 +268,23 @@ The browser dashboard (`trading_dashboard.html`) runs the strategy entirely in J
 - When multiple tickers are run, an All tab shows a side-by-side comparison table
 - Click any row to drill into that ticker's full dashboard
 
+## Order Book Ladder
+The order book panel shows the full bid/ask ladder in the same format used by professional trading terminals. Asks (sellers) sit above the spread in red, bids (buyers) sit below in green. Each row shows the price level and the total quantity resting there, with a horizontal bar whose width is proportional to that level's size relative to the largest order in the book — making liquidity walls instantly visible without reading the numbers.
+The dividing row between bids and asks shows the current spread (best ask minus best bid) and the mid-price (their average), which is the theoretical fair value of the asset at that moment.
+Below the ladder, three summary statistics are shown:
+
+## Bid depth — total shares/contracts resting on the buy side
+Ask depth — total shares/contracts resting on the sell side
+Imbalance — the percentage skew toward buyers or sellers, computed as (bid_depth - ask_depth) / (bid_depth + ask_depth). A reading of 70% bid-heavy means buyers have significantly more resting liquidity than sellers, which can indicate upward price pressure.
+
+## <img width="1512" height="982" alt="Screenshot 2026-04-26 at 7 57 51 PM" src="https://github.com/user-attachments/assets/06b368cd-55d3-4bd5-ad54-4b098b681827" />
+Price Distribution Chart
+Below the ladder is a bar chart showing order size at every price level across the full book. Bids and asks are rendered as side-by-side bars at each level, giving a complete picture of the liquidity profile. Key things to look for:
+
+Tall spikes at specific price levels indicate large resting orders — these act as support (on the bid side) or resistance (on the ask side) and often cause price to slow or reverse when approached
+Thin levels with small bars show price zones where the market can move quickly with little friction
+Asymmetry between bid and ask bars at the same price level reveals where one side has committed significantly more liquidity
+
 ---
 
 ## Supported Symbols
