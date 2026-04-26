@@ -457,46 +457,199 @@ function fillMetrics(t,d) {
   ).join('');
 }
 
-// ── PnL Chart ─────────────────────────────────────────────────────────────────
-function drawPnl(t,curve) {
-  if(charts[t]?.pnl) charts[t].pnl.destroy();
-  const canvas=document.getElementById('pnl-'+t); if(!canvas) return;
-  if(!curve.length) {
-    const ctx=canvas.getContext('2d'); ctx.font="14px 'Times New Roman'"; ctx.fillStyle='#706e68'; ctx.textAlign='center';
-    ctx.fillText('No completed trades in this period',canvas.offsetWidth/2,120); return;
+// ── PnL Candlestick Chart (custom canvas renderer) ───────────────────────────
+function drawPnl(t, curve) {
+  if (charts[t]?.pnl) { charts[t].pnl.destroy(); charts[t].pnl = null; }
+
+  const canvas = document.getElementById('pnl-' + t);
+  if (!canvas) return;
+
+  if (!curve.length) {
+    const ctx = canvas.getContext('2d');
+    ctx.font = "14px 'Times New Roman'"; ctx.fillStyle = '#706e68'; ctx.textAlign = 'center';
+    ctx.fillText('No completed trades in this period', canvas.offsetWidth / 2, 120);
+    return;
   }
-  const ch=new Chart(canvas,{
-    type:'line',
-    data:{
-      labels:curve.map((_,i)=>i+1),
-      datasets:[
-        { label:'P&L', data:curve.map(v=>+v.toFixed(2)),
-          segment:{borderColor:ctx=>{const i=ctx.p0DataIndex;return(curve[i+1]??curve[i])>=curve[i]?'#145228':'#8c1a1a';}},
-          borderWidth:1.5, pointRadius:0, pointHoverRadius:5,
-          pointHoverBackgroundColor:'#111', fill:false, tension:0 },
-        { label:'_zero', data:curve.map(()=>0), borderColor:'rgba(0,0,0,0.15)', borderWidth:1, borderDash:[4,3], pointRadius:0, fill:false, tension:0 }
-      ]
+
+  // Build OHLC candles from the pnl curve.
+  // Each candle = one trade event. Open = prev value, Close = current value.
+  // High = max(open, close) + small wick. Low = min(open, close) - small wick.
+  const candles = curve.map((close, i) => {
+    const open  = i === 0 ? 0 : curve[i - 1];
+    const wick  = Math.abs(close - open) * 0.15;
+    return {
+      open,
+      close,
+      high:  Math.max(open, close) + wick,
+      low:   Math.min(open, close) - wick,
+      green: close >= open,
+    };
+  });
+
+  const GREEN = '#145228';
+  const RED   = '#8c1a1a';
+  const GREEN_FILL = 'rgba(20,82,40,0.75)';
+  const RED_FILL   = 'rgba(140,26,26,0.72)';
+
+  // Use Chart.js bar chart as the axis/grid scaffold, then draw candles on top
+  // via a custom plugin. The bar dataset is invisible (opacity 0).
+  const candlePlugin = {
+    id: 'candlestick',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      const meta = chart.getDatasetMeta(0);
+      if (!meta.data.length) return;
+
+      const barW = meta.data.length > 0 ? meta.data[0].width : 8;
+      const cW   = Math.max(Math.min(barW * 0.75, 18), 3);
+
+      ctx.save();
+      candles.forEach((c, i) => {
+        const el  = meta.data[i];
+        if (!el) return;
+        const cx  = el.x;
+        const yO  = y.getPixelForValue(c.open);
+        const yC  = y.getPixelForValue(c.close);
+        const yH  = y.getPixelForValue(c.high);
+        const yL  = y.getPixelForValue(c.low);
+        const col = c.green ? GREEN : RED;
+        const fill = c.green ? GREEN_FILL : RED_FILL;
+
+        // Wick
+        ctx.beginPath();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1;
+        ctx.moveTo(cx, yH);
+        ctx.lineTo(cx, yL);
+        ctx.stroke();
+
+        // Body
+        const bodyTop = Math.min(yO, yC);
+        const bodyH   = Math.max(Math.abs(yC - yO), 2);
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1;
+        ctx.fillRect(cx - cW / 2, bodyTop, cW, bodyH);
+        ctx.strokeRect(cx - cW / 2, bodyTop, cW, bodyH);
+      });
+      ctx.restore();
+    }
+  };
+
+  // Zero line plugin
+  const zeroLinePlugin = {
+    id: 'zeroline',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y }, chartArea } = chart;
+      const yZero = y.getPixelForValue(0);
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 4]);
+      ctx.moveTo(chartArea.left, yZero);
+      ctx.lineTo(chartArea.right, yZero);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  };
+
+  // Tooltip crosshair
+  let tooltipIdx = null;
+  const crosshairPlugin = {
+    id: 'crosshair',
+    afterDraw(chart) {
+      if (tooltipIdx === null) return;
+      const { ctx, scales: { x, y }, chartArea } = chart;
+      const meta = chart.getDatasetMeta(0);
+      const el = meta.data[tooltipIdx];
+      if (!el) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.moveTo(el.x, chartArea.top);
+      ctx.lineTo(el.x, chartArea.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  };
+
+  // Invisible bar dataset drives the axis scale
+  const allVals = candles.flatMap(c => [c.high, c.low]);
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const pad  = (maxV - minV) * 0.1 || 5;
+
+  const ch = new Chart(canvas, {
+    type: 'bar',
+    plugins: [candlePlugin, zeroLinePlugin, crosshairPlugin],
+    data: {
+      labels: curve.map((_, i) => i + 1),
+      datasets: [{
+        label: 'P&L',
+        data: candles.map(c => c.close),
+        backgroundColor: 'rgba(0,0,0,0)',
+        borderColor:     'rgba(0,0,0,0)',
+        borderWidth: 0,
+      }]
     },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{display:false},
-        tooltip:{backgroundColor:'#fff',borderColor:'#d0cec7',borderWidth:1,titleColor:'#706e68',bodyColor:'#111',
-          titleFont:{family:SERIF,size:10},bodyFont:{family:SERIF,size:13,weight:'bold'},padding:10,
-          callbacks:{title:c=>'Trade #'+c[0].label, label:c=>c.datasetIndex===0?' P&L   '+fmt(c.parsed.y):null, filter:item=>item.datasetIndex===0}}
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      onHover: (evt, els) => {
+        tooltipIdx = els.length ? els[0].index : null;
+        ch.draw();
       },
-      scales:{
-        x:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#706e68',font:{family:SERIF,size:10},maxTicksLimit:10},border:{color:'#111',width:1.5},
-           title:{display:true,text:'TRADE EVENT',color:'#706e68',font:{family:SERIF,size:9},padding:{top:5}}},
-        y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#706e68',font:{family:SERIF,size:10},callback:v=>fmt(v,0)},border:{color:'#111',width:1.5},
-           title:{display:true,text:'CUMULATIVE P&L (USD)',color:'#706e68',font:{family:SERIF,size:9},padding:{bottom:5}}}
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#fff',
+          borderColor: '#d0cec7',
+          borderWidth: 1,
+          titleColor: '#706e68',
+          bodyColor: '#111',
+          titleFont: { family: SERIF, size: 10 },
+          bodyFont:  { family: SERIF, size: 12, weight: 'bold' },
+          padding: 10,
+          callbacks: {
+            title: ctx => 'Trade #' + ctx[0].label,
+            label: ctx => {
+              const c = candles[ctx.dataIndex];
+              return [
+                ' Close:  ' + fmt(c.close),
+                ' Open:   ' + fmt(c.open),
+                ' Change: ' + fmt(c.close - c.open),
+              ];
+            }
+          }
+        }
       },
-      animation:{duration:500}
+      scales: {
+        x: {
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          ticks: { color: '#706e68', font: { family: SERIF, size: 10 }, maxTicksLimit: 10 },
+          border: { color: '#111', width: 1.5 },
+          title: { display: true, text: 'TRADE EVENT', color: '#706e68', font: { family: SERIF, size: 9 }, padding: { top: 5 } }
+        },
+        y: {
+          min: minV - pad,
+          max: maxV + pad,
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          ticks: { color: '#706e68', font: { family: SERIF, size: 10 }, callback: v => fmt(v, 0) },
+          border: { color: '#111', width: 1.5 },
+          title: { display: true, text: 'CUMULATIVE P&L (USD)', color: '#706e68', font: { family: SERIF, size: 9 }, padding: { bottom: 5 } }
+        }
+      },
+      animation: { duration: 400 },
     }
   });
-  if(!charts[t]) charts[t]={};
-  charts[t].pnl=ch;
+
+  if (!charts[t]) charts[t] = {};
+  charts[t].pnl = ch;
 }
 
 // ── Flow Chart ────────────────────────────────────────────────────────────────
